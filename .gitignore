@@ -1,0 +1,11 @@
+# Terraform state files (lokale status, nooit delen)
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Geheime GCP key (service account JSON – NOOIT op GitHub)
+iac/gcp-terraform-sa.json
+
+# Gevoelige variabelen (DB-wachtwoord)
+iac/terraform.tfvars
