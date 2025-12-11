@@ -16,6 +16,10 @@ import sys
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import string
+import secrets
+import datetime
+
 
 
 # Read DB connection settings from environment variables
@@ -46,6 +50,15 @@ def get_db_connection():
         password=DB_PASSWORD,
     )
     return conn
+
+def generate_desktop_credentials(employee):
+    email_prefix = employee["email"].split("@")[0]
+    username = email_prefix.replace(".", "_")
+
+    alphabet = string.ascii_letters + string.digits
+    temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
+
+    return username, temp_password
 
 
 def fetch_new_employees(conn):

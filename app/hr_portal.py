@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 """
-Simple HR Self-Service Portal (MVP)
+Innovatech HR Self-Service Portal (MVP)
 
-- Shows basic employee information from the 'employees' table in Cloud SQL.
-- Employee is selected by email address (as query parameter or form input).
+- HR kan een medewerker zoeken op e-mail en details zien.
+- HR kan een nieuwe medewerker toevoegen via een formulier.
+- Bij het toevoegen wordt de volledige onboarding direct uitgevoerd:
+  * record in de employees-tabel
+  * status = ACTIVE
+  * cloud_account_created = TRUE
+  * workspace_username + tijdelijk wachtwoord worden gegenereerd
 """
 
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, redirect, url_for
+import string
+import secrets
+import datetime
 
 app = Flask(__name__)
 
@@ -17,8 +25,8 @@ app = Flask(__name__)
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "hr_employees")
-DB_USER = os.getenv("hr_app_user")
-DB_PASSWORD = os.getenv("12345")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
 def get_db_connection():
@@ -32,7 +40,18 @@ def get_db_connection():
     return conn
 
 
-HTML_TEMPLATE = """
+def generate_workspace_username(email: str) -> str:
+    # voorbeeld: giovanni.hr@innovatech.com -> giovanni_hr
+    local_part = email.split("@")[0]
+    return local_part.replace(".", "_")
+
+
+def generate_temp_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+INDEX_TEMPLATE = """
 <!doctype html>
 <html>
   <head>
@@ -44,7 +63,14 @@ HTML_TEMPLATE = """
       form { margin-bottom: 1.5rem; }
       label { font-weight: bold; }
       input[type="text"] { padding: 0.3rem; width: 300px; }
-      input[type="submit"] { padding: 0.3rem 0.8rem; }
+      input[type="submit"], a.button {
+        padding: 0.3rem 0.8rem;
+        text-decoration: none;
+        border: 1px solid #ccc;
+        background-color: #f5f5f5;
+        color: #000;
+        margin-right: 0.5rem;
+      }
       table { border-collapse: collapse; margin-top: 1rem; }
       th, td { border: 1px solid #ccc; padding: 0.4rem 0.8rem; }
       th { background-color: #f5f5f5; text-align: left; }
@@ -53,6 +79,10 @@ HTML_TEMPLATE = """
   </head>
   <body>
     <h1>Innovatech HR Self-Service Portal</h1>
+
+    <p>
+      <a href="{{ url_for('add_employee') }}" class="button">+ Add employee</a>
+    </p>
 
     <form method="get" action="/">
       <label for="email">Employee email:</label><br>
@@ -71,6 +101,8 @@ HTML_TEMPLATE = """
         <tr><th>Cloud account created</th><td>{{ employee.cloud_account_created }}</td></tr>
         <tr><th>Deprovisioned</th><td>{{ employee.deprovisioned }}</td></tr>
         <tr><th>Device enrolled</th><td>{{ employee.device_enrolled }}</td></tr>
+        <tr><th>Workspace username</th><td>{{ employee.workspace_username or '-' }}</td></tr>
+        <tr><th>Workspace temp password</th><td>{{ employee.workspace_temp_password or '-' }}</td></tr>
         <tr><th>Last action</th><td>{{ employee.last_action or '-' }}</td></tr>
       </table>
     {% elif email %}
@@ -86,12 +118,64 @@ HTML_TEMPLATE = """
 </html>
 """
 
+ADD_TEMPLATE = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Add employee - Innovatech HR Portal</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; }
+      h1 { font-size: 1.6rem; }
+      form { margin-top: 1rem; max-width: 400px; }
+      label { font-weight: bold; display: block; margin-top: 0.5rem; }
+      input[type="text"], select {
+        padding: 0.3rem;
+        width: 100%;
+      }
+      input[type="submit"], a.button {
+        margin-top: 1rem;
+        padding: 0.3rem 0.8rem;
+        text-decoration: none;
+        border: 1px solid #ccc;
+        background-color: #f5f5f5;
+        color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Add new employee</h1>
+
+    <form method="post" action="{{ url_for('add_employee') }}">
+      <label for="name">Full name</label>
+      <input type="text" id="name" name="name" required>
+
+      <label for="email">Email address</label>
+      <input type="text" id="email" name="email" required placeholder="user@innovatech.com">
+
+      <label for="department">Department</label>
+      <input type="text" id="department" name="department" required>
+
+      <label for="role">Role</label>
+      <select id="role" name="role" required>
+        <option value="Employee">Employee</option>
+        <option value="Manager">Manager</option>
+        <option value="HR_Admin">HR_Admin</option>
+      </select>
+
+      <input type="submit" value="Create and onboard employee">
+      <a href="{{ url_for('index') }}" class="button">Cancel</a>
+    </form>
+  </body>
+</html>
+"""
+
 
 @app.route("/", methods=["GET"])
 def index():
     email = request.args.get("email", "").strip()
-
     employee = None
+
     if email:
         conn = get_db_connection()
         try:
@@ -100,20 +184,78 @@ def index():
                     """
                     SELECT id, name, email, department, role, status,
                            cloud_account_created, deprovisioned,
-                           device_enrolled, last_action
+                           device_enrolled, workspace_username,
+                           workspace_temp_password, last_action
                     FROM employees
                     WHERE email = %s;
                     """,
                     (email,),
                 )
-                row = cur.fetchone()
-                employee = row
+                employee = cur.fetchone()
         finally:
             conn.close()
 
-    return render_template_string(HTML_TEMPLATE, email=email, employee=employee)
+    return render_template_string(INDEX_TEMPLATE, email=email, employee=employee)
+
+
+@app.route("/add", methods=["GET", "POST"])
+def add_employee():
+    if request.method == "GET":
+        return render_template_string(ADD_TEMPLATE)
+
+    # POST: form submit -> volledige onboarding in één stap
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip()
+    department = request.form.get("department", "").strip()
+    role = request.form.get("role", "").strip()
+
+    if not name or not email or not department or not role:
+        return render_template_string(ADD_TEMPLATE)
+
+    # Workspace credentials genereren
+    workspace_username = generate_workspace_username(email)
+    workspace_password = generate_temp_password()
+    when = datetime.datetime.utcnow().isoformat() + "Z"
+    action_text = f"Onboarding completed at {when}"
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO employees
+                  (name, email, department, role,
+                   status, cloud_account_created,
+                   device_enrolled, deprovisioned,
+                   workspace_username, workspace_temp_password,
+                   last_action, created_at, updated_at)
+                VALUES
+                  (%s, %s, %s, %s,
+                   'ACTIVE', TRUE,
+                   TRUE, FALSE,
+                   %s, %s,
+                   %s, NOW(), NOW());
+                """,
+                (
+                    name,
+                    email,
+                    department,
+                    role,
+                    workspace_username,
+                    workspace_password,
+                    action_text,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    print(f"[PORTAL] Onboarded new employee {email} with workspace user {workspace_username}")
+
+    # Na toevoegen ga terug naar detailpagina van deze employee
+    return redirect(url_for("index", email=email))
 
 
 if __name__ == "__main__":
-    # For local/dev use only – in Kubernetes this will be run by gunicorn or similar
+    # Dev-run: in Cloud Shell / lokaal
     app.run(host="0.0.0.0", port=8080, debug=True)
