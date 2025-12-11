@@ -154,10 +154,10 @@ net localgroup "Remote Desktop Users" $u /add
         ],
         "networkInterfaces": [
             {
-                # JOUW eigen VPC
+                # jouw VPC:
                 "network": f"projects/{GCP_PROJECT}/global/networks/innovatech-vpc",
-                # Subnet in europe-west1 waar je GKE/SQL ook zitten
-                "subnetwork": "regions/europe-west1/subnetworks/automation",
+                # jouw subnet in europe-west1:
+                "subnetwork": f"projects/{GCP_PROJECT}/regions/europe-west1/subnetworks/innovatech-vpc-automation",
                 "accessConfigs": [
                     {
                         "type": "ONE_TO_ONE_NAT",
@@ -166,6 +166,7 @@ net localgroup "Remote Desktop Users" $u /add
                 ],
             }
         ],
+
 
         "metadata": {
             "items": [
