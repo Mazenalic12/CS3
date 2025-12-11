@@ -18,6 +18,8 @@ from flask import Flask, request, render_template_string, redirect, url_for
 import string
 import secrets
 import datetime
+import subprocess
+
 
 app = Flask(__name__)
 
@@ -223,37 +225,25 @@ def add_employee():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO employees
-                  (name, email, department, role,
-                   status, cloud_account_created,
-                   device_enrolled, deprovisioned,
-                   workspace_username, workspace_temp_password,
-                   last_action, created_at, updated_at)
-                VALUES
-                  (%s, %s, %s, %s,
-                   'ACTIVE', TRUE,
-                   TRUE, FALSE,
-                   %s, %s,
-                   %s, NOW(), NOW());
+                INSERT INTO employees (name, email, department, role, status)
+                VALUES (%s, %s, %s, %s, 'NEW');
                 """,
-                (
-                    name,
-                    email,
-                    department,
-                    role,
-                    workspace_username,
-                    workspace_password,
-                    action_text,
-                ),
+                (name, email, department, role),
             )
         conn.commit()
     finally:
         conn.close()
 
-    print(f"[PORTAL] Onboarded new employee {email} with workspace user {workspace_username}")
+    # onboarding.py automatisch starten
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    onboarding_script = os.path.join(project_root, "automation", "onboarding.py")
+    subprocess.Popen(["python", onboarding_script])
+
+    print(f"[PORTAL] Created NEW employee {email}, onboarding.py started")
 
     # Na toevoegen ga terug naar detailpagina van deze employee
     return redirect(url_for("index", email=email))
+
 
 
 if __name__ == "__main__":
