@@ -44,10 +44,14 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "12345")
 # GCP project + zone voor de Windows VM's
 GCP_PROJECT = os.getenv("GCP_PROJECT", "cs3-innovatech-hr-project")  # <-- jouw project ID
 GCP_ZONE = os.getenv("GCP_ZONE", "europe-west1-b")
+GCP_REGION = "europe-west1"  # hoort bij europe-west1-b
 
 # Windows image (standaard Windows Server 2019)
 WINDOWS_IMAGE_PROJECT = "windows-cloud"
 WINDOWS_IMAGE_FAMILY = "windows-2019"
+
+NETWORK = f"projects/{GCP_PROJECT}/global/networks/innovatech-vpc"
+SUBNETWORK = f"projects/{GCP_PROJECT}/regions/{GCP_REGION}/subnetworks/automation"
 
 # SMTP voor welkomstmail  (Gmail voorbeeld)
 SMTP_SERVER = "smtp.gmail.com"
@@ -150,7 +154,10 @@ net localgroup "Remote Desktop Users" $u /add
         ],
         "networkInterfaces": [
             {
-                "network": "global/networks/default",
+                # JOUW eigen VPC
+                "network": f"projects/{GCP_PROJECT}/global/networks/innovatech-vpc",
+                # Subnet in europe-west1 waar je GKE/SQL ook zitten
+                "subnetwork": "regions/europe-west1/subnetworks/automation",
                 "accessConfigs": [
                     {
                         "type": "ONE_TO_ONE_NAT",
@@ -159,6 +166,7 @@ net localgroup "Remote Desktop Users" $u /add
                 ],
             }
         ],
+
         "metadata": {
             "items": [
                 {
