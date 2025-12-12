@@ -144,14 +144,74 @@ def create_windows_vm_for_employee(emp, username, temp_password):
     source_disk_image = image_response["selfLink"]
 
     # Startup script: maakt lokale user aan op Windows
+    # rol en afdeling van de medewerker voor op de VM
+    role = (emp.get("role") or "Employee")
+    department = (emp.get("department") or "General")
+
     startup_script = f"""
 <powershell>
-$u = "{username}"
-$p = "{temp_password}"
+$u    = "{username}"
+$p    = "{temp_password}"
+$role = "{role}"
+$dept = "{department}"
+
+# 1) Standaard: lokale user + RDP-recht
 net user $u $p /add
 net localgroup "Remote Desktop Users" $u /add
+
+# 2) RBAC op basis van rol → andere rechten + marker-bestanden
+if ($role -ieq "HR_Admin") {{
+  # HR admins krijgen lokale adminrechten op de werkplek
+  net localgroup "Administrators" $u /add
+  New-Item -Path "C:\\ROLE-HR-ADMIN.txt" -ItemType File -Value "HR admin workstation for $u" -Force
+}} elseif ($role -ieq "Manager") {{
+  New-Item -Path "C:\\ROLE-MANAGER.txt" -ItemType File -Value "Manager workstation for $u" -Force
+}} else {{
+  New-Item -Path "C:\\ROLE-EMPLOYEE.txt" -ItemType File -Value "Employee workstation for $u" -Force
+}}
+
+# 3) Chocolatey installeren (als het nog niet staat)
+try {{
+  if (!(Get-Command choco.exe -ErrorAction SilentlyContinue)) {{
+    Write-Host "Installing Chocolatey..."
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+  }}
+}} catch {{
+  Write-Host "Failed to install Chocolatey: $_"
+}}
+
+function Install-AppSafe($pkg) {{
+  try {{
+    choco install $pkg -y --no-progress
+  }} catch {{
+    Write-Host "Failed to install $pkg: $_"
+  }}
+}}
+
+# 4) Echte applicaties per afdeling
+if ($dept -ieq "HR") {{
+  Install-AppSafe "googlechrome"
+  Install-AppSafe "libreoffice-fresh"
+  Install-AppSafe "sumatrapdf"
+  New-Item -Path "C:\\Apps-HR.txt" -ItemType File -Value "HR apps: Chrome, LibreOffice, PDF tools" -Force
+}} elseif ($dept -ieq "IT") {{
+  Install-AppSafe "googlechrome"
+  Install-AppSafe "vscode"
+  Install-AppSafe "git"
+  Install-AppSafe "putty"
+  New-Item -Path "C:\\Apps-IT.txt" -ItemType File -Value "IT apps: Chrome, VSCode, Git, PuTTY" -Force
+}} elseif ($dept -ieq "Sales") {{
+  Install-AppSafe "googlechrome"
+  Install-AppSafe "sumatrapdf"
+  New-Item -Path "C:\\Apps-Sales.txt" -ItemType File -Value "Sales apps: Chrome, PDF tools" -Force
+}} else {{
+  New-Item -Path "C:\\Apps-General.txt" -ItemType File -Value "Generic tools for department: $dept" -Force
+}}
 </powershell>
 """
+
 
     # LET OP: netwerk + subnet moeten bestaan in jouw project
     config = {
