@@ -33,6 +33,12 @@ from googleapiclient.errors import HttpError
 import smtplib
 from email.message import EmailMessage
 
+# Optional Prometheus metrics (safe fallback if library is missing)
+try:
+    from prometheus_client import Counter
+except ImportError:  # pragma: no cover - optional dependency
+    Counter = None
+
 # ========= CONFIG =========
 
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
@@ -44,20 +50,26 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "12345")
 # GCP project + zone voor de Windows VM's
 GCP_PROJECT = os.getenv("GCP_PROJECT", "cs3-innovatech-hr-project")  # <-- jouw project ID
 GCP_ZONE = os.getenv("GCP_ZONE", "europe-west1-b")
-GCP_REGION = "europe-west1"  # hoort bij europe-west1-b
 
 # Windows image (standaard Windows Server 2019)
 WINDOWS_IMAGE_PROJECT = "windows-cloud"
 WINDOWS_IMAGE_FAMILY = "windows-2019"
-
-NETWORK = f"projects/{GCP_PROJECT}/global/networks/innovatech-vpc"
-SUBNETWORK = f"projects/{GCP_PROJECT}/regions/{GCP_REGION}/subnetworks/automation"
 
 # SMTP voor welkomstmail  (Gmail voorbeeld)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SMTP_USER = os.getenv("HR_SMTP_USER")       # <-- zet deze als env var
 SMTP_PASSWORD = os.getenv("HR_SMTP_PASS")   # <-- zet deze als env var
+
+# Prometheus-style counters (optional; only active when prometheus_client is installed)
+if Counter is not None:
+    ONBOARDING_ATTEMPTS = Counter(
+        "automation_onboarding_attempts_total",
+        "Number of employees processed by the onboarding service",
+        ["result"],
+    )
+else:
+    ONBOARDING_ATTEMPTS = None
 
 # ================= HELPERS =================
 
@@ -94,18 +106,20 @@ _compute_client = None
 def get_compute_client():
     global _compute_client
     if _compute_client is None:
-        _compute_client = discovery.build("compute", "v1", cache_discovery=False)
+        _compute_client = discovery.build("compute", "v1")
     return _compute_client
 
 
-def wait_for_operation(compute, project, zone, op_name):
-    """Wacht tot de instance-create operation klaar is."""
+def wait_for_operation(compute, project, zone, operation):
+    """Wacht tot een GCE-operatie klaar is."""
+    print(f"[VM] Waiting for operation {operation} to finish...")
     while True:
-        result = compute.zoneOperations().get(
-            project=project, zone=zone, operation=op_name
-        ).execute()
-
-        if result.get("status") == "DONE":
+        result = (
+            compute.zoneOperations()
+            .get(project=project, zone=zone, operation=operation)
+            .execute()
+        )
+        if result["status"] == "DONE":
             if "error" in result:
                 raise RuntimeError(f"GCE operation error: {result['error']}")
             return
@@ -139,6 +153,7 @@ net localgroup "Remote Desktop Users" $u /add
 </powershell>
 """
 
+    # LET OP: netwerk + subnet moeten bestaan in jouw project
     config = {
         "name": instance_name,
         "machineType": f"zones/{GCP_ZONE}/machineTypes/e2-standard-2",
@@ -148,15 +163,13 @@ net localgroup "Remote Desktop Users" $u /add
                 "autoDelete": True,
                 "initializeParams": {
                     "sourceImage": source_disk_image,
-                    "diskSizeGb": "50",
+                    "diskSizeGb": 50,
                 },
             }
         ],
         "networkInterfaces": [
             {
-                # jouw VPC:
                 "network": f"projects/{GCP_PROJECT}/global/networks/innovatech-vpc",
-                # jouw subnet in europe-west1:
                 "subnetwork": f"projects/{GCP_PROJECT}/regions/europe-west1/subnetworks/innovatech-vpc-automation",
                 "accessConfigs": [
                     {
@@ -166,8 +179,6 @@ net localgroup "Remote Desktop Users" $u /add
                 ],
             }
         ],
-
-
         "metadata": {
             "items": [
                 {
@@ -200,38 +211,67 @@ net localgroup "Remote Desktop Users" $u /add
     return instance_name, public_ip
 
 
+# ========== CLOUD IDENTITY (SIMULATED) ==========
+
+def _groups_for_role(role: str):
+    """Return the logical access groups for a given business role."""
+    base_groups = ["corp-all-employees"]
+    role_norm = (role or "Employee").strip().upper()
+
+    if role_norm == "MANAGER":
+        base_groups.append("corp-managers")
+    elif role_norm in {"HR_ADMIN", "HR-ADMIN", "HR ADMIN"}:
+        base_groups.append("corp-hr-admins")
+
+    return base_groups
+
+
+def simulate_cloud_identity_onboarding(emp, username: str) -> None:
+    """
+    Simuleert de stappen die normaal via Cloud Identity / Admin SDK gaan:
+    - aanmaken van een Identity-account
+    - toevoegen aan de juiste access-groepen op basis van role.
+    Dit blijft bewust bij logging; er worden geen echte accounts aangemaakt.
+    """
+    email = emp.get("email")
+    role = emp.get("role", "Employee")
+    groups = _groups_for_role(role)
+
+    print(f"[IDENTITY] Creating Cloud Identity user {email} (username: {username})")
+    print(f"[IDENTITY] Applying baseline security / org unit policies for {email}")
+
+    for g in groups:
+        print(f"[IDENTITY] Adding {email} to group {g}")
+
+    if not groups:
+        print(f"[IDENTITY] No groups configured for role {role}, skipping group assignment")
+
+
 # ========== EMAIL ==========
 
 def send_welcome_email(emp, username, temp_password, public_ip):
     if not SMTP_USER or not SMTP_PASSWORD:
-        print("[MAIL] SMTP env vars niet gezet, email wordt overgeslagen.")
+        print("[MAIL] SMTP credentials not configured, skipping email.")
         return
 
     msg = EmailMessage()
-    msg["Subject"] = "Welkom bij Innovatech – je account en werkplek zijn aangemaakt"
+    msg["Subject"] = "Welkom bij Innovatech – je digitale werkplek is klaar"
     msg["From"] = SMTP_USER
     msg["To"] = emp["email"]
 
-    body = f"""Hallo {emp['name']},
+    body = f"""Hoi {emp['name']},
 
-Welkom bij Innovatech! Je account en virtuele werkplek zijn aangemaakt.
+Je Innovatech werkplek is aangemaakt.
 
-Afdeling: {emp.get('department') or '-'}
-Rol (HR): {emp.get('role') or '-'}
+Windows-werkplek (RDP):
+- Public IP: {public_ip}
+- Windows gebruikersnaam: {username}
+- Tijdelijk wachtwoord: {temp_password}
 
-Windows werkplek (GCP VM)
--------------------------
-VM public IP: {public_ip}
-Gebruikersnaam: {username}
-Tijdelijk wachtwoord (eerste login): {temp_password}
+Log de eerste keer in via Remote Desktop en kies direct een eigen sterk wachtwoord.
 
-Je kunt inloggen via Remote Desktop (RDP) vanaf je eigen pc/laptop.
-Bij de eerste login moet je je wachtwoord direct wijzigen.
-
-Je ontvangt deze mail automatisch vanuit het HR self-service portal.
-
-Met vriendelijke groet,
-Innovatech HR
+Groeten,
+Innovatech IT Automation Service
 """
     msg.set_content(body)
 
@@ -305,7 +345,12 @@ def main():
                 )
             except HttpError as e:
                 print(f"[ERROR] Failed to create VM for {emp['email']}: {e}")
+                if ONBOARDING_ATTEMPTS is not None:
+                    ONBOARDING_ATTEMPTS.labels(result="vm_error").inc()
                 continue
+
+            # Simulated Cloud Identity account + group assignment
+            simulate_cloud_identity_onboarding(emp, username)
 
             # Welkomstmail
             send_welcome_email(emp, username, temp_password, public_ip)
@@ -313,6 +358,9 @@ def main():
             # DB updaten
             mark_employee_as_onboarded(conn, emp["id"], username, temp_password)
             print("[OK] Employee marked as ACTIVE in database.")
+
+            if ONBOARDING_ATTEMPTS is not None:
+                ONBOARDING_ATTEMPTS.labels(result="success").inc()
 
         print("\n=== Onboarding run finished successfully ===")
     finally:

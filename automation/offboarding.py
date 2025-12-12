@@ -16,6 +16,11 @@ import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+# Optional Prometheus metrics (safe fallback if library is missing)
+try:
+    from prometheus_client import Counter
+except ImportError:  # pragma: no cover - optional dependency
+    Counter = None
 
 # Same env vars as onboarding.py
 DB_HOST = os.getenv("DB_HOST")
@@ -23,6 +28,16 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "hr_employees")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+# Prometheus-style counters (optional; only active when prometheus_client is installed)
+if Counter is not None:
+    OFFBOARDING_ATTEMPTS = Counter(
+        "automation_offboarding_attempts_total",
+        "Number of employees processed by the offboarding service",
+        ["result"],
+    )
+else:
+    OFFBOARDING_ATTEMPTS = None
 
 
 def get_db_connection():
@@ -62,6 +77,19 @@ def fetch_employees_to_offboard(conn):
         return cur.fetchall()
 
 
+def _groups_for_role(role: str):
+    """Return the logical access groups for a given business role."""
+    base_groups = ["corp-all-employees"]
+    role_norm = (role or "Employee").strip().upper()
+
+    if role_norm == "MANAGER":
+        base_groups.append("corp-managers")
+    elif role_norm in {"HR_ADMIN", "HR-ADMIN", "HR ADMIN"}:
+        base_groups.append("corp-hr-admins")
+
+    return base_groups
+
+
 def simulate_cloud_identity_offboarding(employee):
     """
     Simulate the Cloud Identity offboarding.
@@ -70,8 +98,15 @@ def simulate_cloud_identity_offboarding(employee):
     - disable the user in Cloud Identity
     - remove the user from all access groups
     """
-    print(f"[OFFBOARD] Disabling cloud identity account for {employee['email']}")
-    print(f"[OFFBOARD] Removing {employee['email']} from all groups")
+    email = employee.get("email")
+    role = employee.get("role", "Employee")
+    groups = _groups_for_role(role)
+
+    print(f"[OFFBOARD] Disabling cloud identity account for {email}")
+    print(f"[OFFBOARD] Revoking active sessions / tokens for {email}")
+
+    for g in groups:
+        print(f"[OFFBOARD] Removing {email} from group {g}")
 
 
 def mark_employee_as_offboarded(conn, employee_id):
@@ -105,9 +140,18 @@ def main():
             print(f"Found {len(employees)} employee(s) to offboard.")
             for emp in employees:
                 print(f"\nProcessing employee ID {emp['id']} - {emp['email']}")
-                simulate_cloud_identity_offboarding(emp)
-                mark_employee_as_offboarded(conn, emp["id"])
+                try:
+                    simulate_cloud_identity_offboarding(emp)
+                    mark_employee_as_offboarded(conn, emp["id"])
+                except Exception as e:
+                    print(f"[ERROR] Failed to offboard {emp['email']}: {e}")
+                    if OFFBOARDING_ATTEMPTS is not None:
+                        OFFBOARDING_ATTEMPTS.labels(result="error").inc()
+                    continue
+
                 print("[OK] Employee marked as deprovisioned in database.")
+                if OFFBOARDING_ATTEMPTS is not None:
+                    OFFBOARDING_ATTEMPTS.labels(result="success").inc()
 
         print("\n=== Offboarding run finished successfully ===")
     finally:
