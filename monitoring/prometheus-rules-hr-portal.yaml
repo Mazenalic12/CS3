@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: hr-portal-alerts
+  namespace: monitoring
+spec:
+  groups:
+  - name: hr-portal.rules
+    rules:
+    - alert: HRPortalFrontendDown
+      expr: probe_success == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "HR Portal frontend is DOWN (blackbox probe)"
+        description: "HTTP probe failed for 5 minutes."
+
+    - alert: HRPortalHighErrorRate
+      expr: |
+        (
+          sum(rate(flask_http_request_total{status=~"5.."}[5m]))
+          /
+          sum(rate(flask_http_request_total[5m]))
+        ) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High 5xx error rate on HR Portal"
+        description: "More than 5% of requests are 5xx for 5 minutes."

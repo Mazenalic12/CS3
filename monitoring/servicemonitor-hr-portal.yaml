@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hr-portal
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - hr-portal
+  selector:
+    matchLabels:
+      app: hr-portal
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

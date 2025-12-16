@@ -1,0 +1,13 @@
+grafana:
+  enabled: true
+  service:
+    type: LoadBalancer
+
+prometheus:
+  prometheusSpec:
+    # allow scraping ServiceMonitors from other namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    # allow rules from other namespaces (optional, maar handig)
+    ruleSelectorNilUsesHelmValues: false
+    ruleNamespaceSelector: {}
