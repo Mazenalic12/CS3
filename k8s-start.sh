@@ -66,7 +66,7 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 kubectl apply -f "$REPO_ROOT/k8s/hr-portal-deployment.yaml"
 kubectl apply -f "$REPO_ROOT/k8s/hr-portal-service.yaml"
 
-kubectl -n hr-portal rollout status deployment/hr-portal --timeout=5m
+
 
 # 6. Status tonen
 echo "[INFO] Current pods in namespace hr-portal:"
