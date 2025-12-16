@@ -48,12 +48,25 @@ kubectl create secret generic cloud-sql-credentials \
   --from-file=service_account.json="$HOME/cs3-gke-sql-sa-key.json" \
   --dry-run=client -o yaml | kubectl apply -f -
 
+echo "[INFO] Ensuring GKE nodes can pull from Artifact Registry..."
+NODE_SA=$(gcloud container clusters describe "$CLUSTER_NAME" --zone "$ZONE" \
+  --format="value(nodeConfig.serviceAccount)")
+echo "[INFO] Node service account: $NODE_SA"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${NODE_SA}" \
+  --role="roles/artifactregistry.reader" --quiet
+
+
+
 # 5. Deployment + Service apply’en
 echo "[INFO] Applying Kubernetes manifests..."
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 kubectl apply -f "$REPO_ROOT/k8s/hr-portal-deployment.yaml"
 kubectl apply -f "$REPO_ROOT/k8s/hr-portal-service.yaml"
+
+kubectl -n hr-portal rollout status deployment/hr-portal --timeout=5m
 
 # 6. Status tonen
 echo "[INFO] Current pods in namespace hr-portal:"

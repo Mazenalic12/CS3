@@ -1,0 +1,259 @@
+{
+  "version": 4,
+  "terraform_version": "1.9.5",
+  "serial": 57,
+  "lineage": "31a1af43-5933-93c4-42d6-baac490af542",
+  "outputs": {},
+  "resources": [
+    {
+      "mode": "managed",
+      "type": "google_compute_global_address",
+      "name": "sql_private_ip",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "address": "10.15.0.0",
+            "address_type": "INTERNAL",
+            "creation_timestamp": "2025-12-07T09:39:18.751-08:00",
+            "description": "",
+            "effective_labels": {},
+            "id": "projects/cs3-innovatech-hr-project/global/addresses/sql-private-ip-range",
+            "ip_version": "",
+            "label_fingerprint": "42WmSpB8rSM=",
+            "labels": {},
+            "name": "sql-private-ip-range",
+            "network": "https://www.googleapis.com/compute/v1/projects/cs3-innovatech-hr-project/global/networks/innovatech-vpc",
+            "prefix_length": 16,
+            "project": "cs3-innovatech-hr-project",
+            "purpose": "VPC_PEERING",
+            "self_link": "https://www.googleapis.com/compute/v1/projects/cs3-innovatech-hr-project/global/addresses/sql-private-ip-range",
+            "terraform_labels": {},
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH0sInNjaGVtYV92ZXJzaW9uIjoiMCJ9",
+          "dependencies": [
+            "google_compute_network.vpc"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_compute_network",
+      "name": "vpc",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "auto_create_subnetworks": false,
+            "delete_default_routes_on_create": false,
+            "description": "",
+            "enable_ula_internal_ipv6": false,
+            "gateway_ipv4": "",
+            "id": "projects/cs3-innovatech-hr-project/global/networks/innovatech-vpc",
+            "internal_ipv6_range": "",
+            "mtu": 0,
+            "name": "innovatech-vpc",
+            "network_firewall_policy_enforcement_order": "AFTER_CLASSIC_FIREWALL",
+            "numeric_id": "6135814059083866856",
+            "project": "cs3-innovatech-hr-project",
+            "routing_mode": "REGIONAL",
+            "self_link": "https://www.googleapis.com/compute/v1/projects/cs3-innovatech-hr-project/global/networks/innovatech-vpc",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH0sInNjaGVtYV92ZXJzaW9uIjoiMCJ9"
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_service_networking_connection",
+      "name": "sql_vpc_connection",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "deletion_policy": null,
+            "id": "projects%2Fcs3-innovatech-hr-project%2Fglobal%2Fnetworks%2Finnovatech-vpc:services%2Fservicenetworking.googleapis.com",
+            "network": "projects/cs3-innovatech-hr-project/global/networks/innovatech-vpc",
+            "peering": "servicenetworking-googleapis-com",
+            "reserved_peering_ranges": [
+              "sql-private-ip-range"
+            ],
+            "service": "services/servicenetworking.googleapis.com",
+            "timeouts": null,
+            "update_on_creation_fail": null
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6NjAwMDAwMDAwMDAwLCJ1cGRhdGUiOjYwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_compute_global_address.sql_private_ip",
+            "google_compute_network.vpc"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_sql_database_instance",
+      "name": "hr",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "available_maintenance_versions": [],
+            "clone": [],
+            "connection_name": "cs3-innovatech-hr-project:europe-west1:hr-postgres-db",
+            "database_version": "POSTGRES_15",
+            "deletion_protection": true,
+            "dns_name": "",
+            "encryption_key_name": null,
+            "first_ip_address": "34.38.100.2",
+            "id": "hr-postgres-db",
+            "instance_type": "CLOUD_SQL_INSTANCE",
+            "ip_address": [
+              {
+                "ip_address": "34.38.100.2",
+                "time_to_retire": "",
+                "type": "PRIMARY"
+              },
+              {
+                "ip_address": "34.78.99.146",
+                "time_to_retire": "",
+                "type": "OUTGOING"
+              },
+              {
+                "ip_address": "10.15.0.15",
+                "time_to_retire": "",
+                "type": "PRIVATE"
+              }
+            ],
+            "maintenance_version": "POSTGRES_15_15.R20251004.01_26",
+            "master_instance_name": "",
+            "name": "hr-postgres-db",
+            "private_ip_address": "10.15.0.15",
+            "project": "cs3-innovatech-hr-project",
+            "psc_service_attachment_link": "",
+            "public_ip_address": "34.38.100.2",
+            "region": "europe-west1",
+            "replica_configuration": [],
+            "restore_backup_context": [],
+            "root_password": null,
+            "self_link": "https://sqladmin.googleapis.com/sql/v1beta4/projects/cs3-innovatech-hr-project/instances/hr-postgres-db",
+            "server_ca_cert": [
+              {
+                "cert": "-----BEGIN CERTIFICATE-----\nMIIDfzCCAmegAwIBAgIBADANBgkqhkiG9w0BAQsFADB3MS0wKwYDVQQuEyRjMDlj\nNWFjYy0xMTMwLTRhOTgtYTI1Zi03ODExNzk3ZWY1OTYxIzAhBgNVBAMTGkdvb2ds\nZSBDbG91ZCBTUUwgU2VydmVyIENBMRQwEgYDVQQKEwtHb29nbGUsIEluYzELMAkG\nA1UEBhMCVVMwHhcNMjUxMjE1MTMyNTU5WhcNMzUxMjEzMTMyNjU5WjB3MS0wKwYD\nVQQuEyRjMDljNWFjYy0xMTMwLTRhOTgtYTI1Zi03ODExNzk3ZWY1OTYxIzAhBgNV\nBAMTGkdvb2dsZSBDbG91ZCBTUUwgU2VydmVyIENBMRQwEgYDVQQKEwtHb29nbGUs\nIEluYzELMAkGA1UEBhMCVVMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB\nAQCXUqPh1nygILZmC1DrcQFyjMP26e6808yrJ95IzubN9VF/j1pVyx9NaSOifyFO\nOBEfHWXVCd/Ituf5zCJjsLTlAItL79He02EEHtVtDzajFrjL3ntbKAVTzcwdwP4c\nshWvlHz7eGVhPrdTD1cxUko9X/Cu6bh6Upu7VyCCPwEOfjS8EloCqcHs33Ar90IP\nIDqxGQaTPqSD4ONvjiOCj+OADqDe42cjZcykUYxL9Y8rk7etkra2m3um1/0goht9\n8hyt7LAlYmBvTbRJRkf1o5YMkKiLja4HB60n2lN9PpPa+NVhMRkPgzxUFlLgCYaR\niu4iD+XYQMYdGfMbUIeVTXLRAgMBAAGjFjAUMBIGA1UdEwEB/wQIMAYBAf8CAQAw\nDQYJKoZIhvcNAQELBQADggEBAANB6/ED867Btx3fYHhWT4NgLy664iVJ+C9oRJSi\nVw2LnKkhEE/eE/BFF46KqzBVI5EUjKaf6tIP2GCJ73Mf4OQ9R1jQOujGO6x+I+jg\njKipSRRO2kYizu0SkdUCc79JjQQ02RQsSnJK43vqYGOPaFQp6ZYmgiz2QisbWfJJ\nYSaeAapxvbXw7OmJZjhppsLj1d6FqS3yg5f3ML7X3PNzSnhDMdzxRxxeb0MLAr0B\n6K0WiOdjCRLu32lp7ZdH73CsM6uJ9x8gUhzELeGyCBh+zhtUdalFhcThHO7t3ofh\n+KESDVj+IuiwwmB/DqAs01+N6NCI4hsivm9Khae22MRScF4=\n-----END CERTIFICATE-----",
+                "common_name": "C=US,O=Google\\, Inc,CN=Google Cloud SQL Server CA,dnQualifier=c09c5acc-1130-4a98-a25f-7811797ef596",
+                "create_time": "2025-12-15T13:25:59.750Z",
+                "expiration_time": "2035-12-13T13:26:59.750Z",
+                "sha1_fingerprint": "043d6fd56cc5bf4d2b518466173b7385a6479851"
+              }
+            ],
+            "service_account_email_address": "p782660766900-slx2xu@gcp-sa-cloud-sql.iam.gserviceaccount.com",
+            "settings": [
+              {
+                "activation_policy": "ALWAYS",
+                "active_directory_config": [],
+                "advanced_machine_features": [],
+                "availability_type": "ZONAL",
+                "backup_configuration": [
+                  {
+                    "backup_retention_settings": [
+                      {
+                        "retained_backups": 7,
+                        "retention_unit": "COUNT"
+                      }
+                    ],
+                    "binary_log_enabled": false,
+                    "enabled": true,
+                    "location": "",
+                    "point_in_time_recovery_enabled": false,
+                    "start_time": "18:00",
+                    "transaction_log_retention_days": 7
+                  }
+                ],
+                "collation": "",
+                "connector_enforcement": "NOT_REQUIRED",
+                "data_cache_config": [],
+                "database_flags": [],
+                "deletion_protection_enabled": false,
+                "deny_maintenance_period": [],
+                "disk_autoresize": true,
+                "disk_autoresize_limit": 0,
+                "disk_size": 10,
+                "disk_type": "PD_SSD",
+                "edition": "ENTERPRISE",
+                "enable_dataplex_integration": false,
+                "enable_google_ml_integration": false,
+                "insights_config": [],
+                "ip_configuration": [
+                  {
+                    "allocated_ip_range": "",
+                    "authorized_networks": [
+                      {
+                        "expiration_time": "",
+                        "name": "anywhere-dev",
+                        "value": "0.0.0.0/0"
+                      }
+                    ],
+                    "enable_private_path_for_google_cloud_services": false,
+                    "ipv4_enabled": true,
+                    "private_network": "projects/cs3-innovatech-hr-project/global/networks/innovatech-vpc",
+                    "psc_config": [],
+                    "require_ssl": false,
+                    "server_ca_mode": "GOOGLE_MANAGED_INTERNAL_CA",
+                    "ssl_mode": ""
+                  }
+                ],
+                "location_preference": [
+                  {
+                    "follow_gae_application": "",
+                    "secondary_zone": "",
+                    "zone": "europe-west1-d"
+                  }
+                ],
+                "maintenance_window": [],
+                "password_validation_policy": [],
+                "pricing_plan": "PER_USE",
+                "sql_server_audit_config": [],
+                "tier": "db-custom-1-3840",
+                "time_zone": "",
+                "user_labels": {},
+                "version": 3
+              }
+            ],
+            "timeouts": null
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "server_ca_cert"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "root_password"
+              }
+            ]
+          ],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo1NDAwMDAwMDAwMDAwLCJkZWxldGUiOjU0MDAwMDAwMDAwMDAsInVwZGF0ZSI6NTQwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_compute_global_address.sql_private_ip",
+            "google_compute_network.vpc",
+            "google_service_networking_connection.sql_vpc_connection"
+          ]
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}
