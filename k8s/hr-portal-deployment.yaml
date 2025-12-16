@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hr-portal
+  namespace: hr-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hr-portal
+  template:
+    metadata:
+      labels:
+        app: hr-portal
+    spec:
+      containers:
+        - name: app
+          image: europe-west1-docker.pkg.dev/cs3-innovatech-hr-project/hr-portal-repo/hr-portal:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: hr-portal-env
+
+
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.20.0
+          args:
+            - "--port=5432"
+            - "cs3-innovatech-hr-project:europe-west1:hr-postgres-db"
+            - "--credentials-file=/secrets/service_account.json"
+          securityContext:
+            runAsNonRoot: true
+          volumeMounts:
+            - name: cloudsql-credentials
+              mountPath: /secrets
+              readOnly: true
+      volumes:
+        - name: cloudsql-credentials
+          secret:
+            secretName: cloud-sql-credentials
